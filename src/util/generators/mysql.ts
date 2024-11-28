@@ -1,8 +1,7 @@
-import { s } from '@/util/escape';
-import { extractManyToManyModels } from '@/util/extract-many-to-many-models';
-import { UnReadonlyDeep } from '@/util/un-readonly-deep';
-import { createPrismaSchemaBuilder } from '@mrleebo/prisma-ast';
-import { type DMMF, GeneratorError, type GeneratorOptions } from '@prisma/generator-helper';
+import {s} from '@/util/escape';
+import {extractManyToManyModels} from '@/util/extract-many-to-many-models';
+import {UnReadonlyDeep} from '@/util/un-readonly-deep';
+import {type DMMF, GeneratorError, type GeneratorOptions} from '@prisma/generator-helper';
 
 const mySqlImports = new Set<string>(['mysqlTable']);
 const drizzleImports = new Set<string>([]);
@@ -11,7 +10,8 @@ const prismaToDrizzleType = (
 	type: string,
 	colDbName: string,
 	prismaEnum?: UnReadonlyDeep<DMMF.DatamodelEnum>,
-	nativeType?: string,
+	nativeType?: MySQLNativeTypeMappings,
+	nativeTypeAttributes?: readonly string[],
 ) => {
 	if (prismaEnum) {
 		mySqlImports.add('mysqlEnum');
@@ -29,9 +29,11 @@ const prismaToDrizzleType = (
 			// Drizzle doesn't support it yet...
 			throw new GeneratorError("Drizzle ORM doesn't support binary data type for MySQL");
 		case 'datetime':
-			if (nativeType === 'time') {
+			if (nativeType === 'Time') {
 				mySqlImports.add('time');
-				return `time('${colDbName}', { precision: 3 })`;
+				const precision = nativeTypeAttributes?.at(0) ?? '3';
+
+				return `time('${colDbName}', { precision: ${precision} })`;
 			}
 
 			mySqlImports.add('datetime');
@@ -127,7 +129,8 @@ const addColumnModifiers = (field: DMMF.Field, column: string) => {
 const prismaToDrizzleColumn = (
 	field: DMMF.Field,
 	enums: UnReadonlyDeep<DMMF.DatamodelEnum[]>,
-	nativeType?: string,
+	nativeType?: MySQLNativeTypeMappings,
+	nativeTypeAttributes?: readonly string[],
 ): string | undefined => {
 	const colDbName = s(field.dbName ?? field.name);
 	let column = `\t${field.name}: `;
@@ -137,6 +140,7 @@ const prismaToDrizzleColumn = (
 		colDbName,
 		field.kind === 'enum' ? enums.find((e) => e.name === field.type)! : undefined,
 		nativeType,
+		nativeTypeAttributes,
 	);
 	if (!drizzleType) return undefined;
 
@@ -158,37 +162,21 @@ export const generateMySqlSchema = (options: GeneratorOptions) => {
 	const tables: string[] = [];
 	const rqb: string[] = [];
 
-	const prismaSchemaAstBuilder = createPrismaSchemaBuilder(options.datamodel);
-
 	for (const schemaTable of modelsWithImplicit) {
-		const modelAst = prismaSchemaAstBuilder.findByType('model', { name: schemaTable.name });
-
-		if (!modelAst) {
-			throw new Error(`Model ${schemaTable.name} not found in schema`);
-		}
-
 		const tableDbName = s(schemaTable.dbName ?? schemaTable.name);
 
 		const columnFields = Object.fromEntries(
 			schemaTable.fields
 				.map((field) => {
-					const fieldAst = prismaSchemaAstBuilder.findByType('field', {
-						name: field.name,
-						within: modelAst.properties,
-					});
-
-					if (!fieldAst) {
-						throw new Error(`Model ${modelAst.name} not found in schema`);
-					}
-
-					const dbAttribute = fieldAst.attributes?.find((attr) => attr.group === 'db');
+					const [nativeType, nativeTypeAttributes = []] = field.nativeType ?? [];
 
 					return [
 						field.name,
 						prismaToDrizzleColumn(
 							field,
 							enums as UnReadonlyDeep<typeof enums>,
-							dbAttribute?.name.toLowerCase(),
+							nativeType as MySQLNativeTypeMappings | undefined,
+							nativeTypeAttributes,
 						),
 					];
 				})
@@ -306,7 +294,5 @@ export const generateMySqlSchema = (options: GeneratorOptions) => {
 	let importsStr: string | undefined = [drizzleImportsStr, mySqlImportsStr].filter((e) => e !== undefined).join('\n');
 	if (!importsStr.length) importsStr = undefined;
 
-	const output = [importsStr, ...tables, ...rqb].filter((e) => e !== undefined).join('\n\n');
-
-	return output;
+	return [importsStr, ...tables, ...rqb].filter((e) => e !== undefined).join('\n\n');
 };
