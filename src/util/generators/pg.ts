@@ -1,7 +1,7 @@
-import {s} from '@/util/escape';
-import {extractManyToManyModels} from '@/util/extract-many-to-many-models';
-import {UnReadonlyDeep} from '@/util/un-readonly-deep';
-import {type DMMF, GeneratorError, type GeneratorOptions} from '@prisma/generator-helper';
+import { s } from '@/util/escape';
+import { extractManyToManyModels } from '@/util/extract-many-to-many-models';
+import { UnReadonlyDeep } from '@/util/un-readonly-deep';
+import { type DMMF, GeneratorError, type GeneratorOptions } from '@prisma/generator-helper';
 
 const pgImports = new Set<string>();
 const drizzleImports = new Set<string>();
@@ -25,22 +25,50 @@ const prismaToDrizzleType = (
 			// Drizzle doesn't support it yet...
 			throw new GeneratorError("Drizzle ORM doesn't support binary data type for PostgreSQL");
 		case 'datetime':
+			if (nativeType === 'Date') {
+				pgImports.add('date');
+				return `date('${colDbName}')`;
+			}
 			if (nativeType === 'Time') {
 				pgImports.add('time');
-				const precision = nativeTypeAttributes?.at(0) ?? '3';
-
+				const precision = nativeTypeAttributes?.[0] ?? '3';
 				return `time('${colDbName}', { precision: ${precision} })`;
 			}
-
+			if (nativeType === 'Timetz') {
+				const precision = nativeTypeAttributes?.[0] ?? '3';
+				return `time('${colDbName}', { precision: ${precision}, withTimezone: true })`;
+			}
+			if (nativeType === 'Timestamp') {
+				pgImports.add('timestamp');
+				const precision = nativeTypeAttributes?.[0] ?? '3';
+				return `timestamp('${colDbName}', { precision: ${precision} })`;
+			}
+			if (nativeType === 'Timestamptz') {
+				pgImports.add('timestamp');
+				const precision = nativeTypeAttributes?.[0] ?? '3';
+				return `timestamp('${colDbName}', { precision: ${precision}, withTimezone: true })`;
+			}
+			// Default to timestamp without time zone if no native type is specified
 			pgImports.add('timestamp');
 			return `timestamp('${colDbName}', { precision: 3 })`;
 		case 'decimal':
 			pgImports.add('decimal');
-			return `decimal('${colDbName}', { precision: 65, scale: 30 })`;
+			const precision = nativeTypeAttributes?.[0] ?? '65';
+			const scale = nativeTypeAttributes?.[1] ?? '30';
+			return `decimal('${colDbName}', { precision: ${precision}, scale: ${scale} })`;
 		case 'float':
 			pgImports.add('doublePrecision');
 			return `doublePrecision('${colDbName}')`;
 		case 'json':
+			if (nativeType === 'Json') {
+				pgImports.add('json');
+				return `json('${colDbName}')`;
+			}
+			if (nativeType === 'JsonB') {
+				pgImports.add('jsonb');
+				return `jsonb('${colDbName}')`;
+			}
+			// Default to jsonb if no native type is specified
 			pgImports.add('jsonb');
 			return `jsonb('${colDbName}')`;
 		case 'int':
