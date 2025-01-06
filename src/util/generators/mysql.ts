@@ -1,7 +1,7 @@
-import {s} from '@/util/escape';
-import {extractManyToManyModels} from '@/util/extract-many-to-many-models';
-import {UnReadonlyDeep} from '@/util/un-readonly-deep';
-import {type DMMF, GeneratorError, type GeneratorOptions} from '@prisma/generator-helper';
+import { s } from '@/util/escape';
+import { extractManyToManyModels } from '@/util/extract-many-to-many-models';
+import { UnReadonlyDeep } from '@/util/un-readonly-deep';
+import { type DMMF, GeneratorError, type GeneratorOptions } from '@prisma/generator-helper';
 
 const mySqlImports = new Set<string>(['mysqlTable']);
 const drizzleImports = new Set<string>([]);
@@ -101,7 +101,7 @@ const addColumnModifiers = (field: DMMF.Field, column: string) => {
 					break;
 				}
 
-				if (/^uuid\([0-9]*\)$/.test(value.name)) {
+				if (/^uuid\([0-9]*\)$/.test(value.name) || value.name === "uuid") {
 					column = column + `.default(sql\`uuid()\`)`;
 
 					drizzleImports.add('sql');

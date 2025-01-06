@@ -130,7 +130,7 @@ const addColumnModifiers = (field: DMMF.Field, column: string) => {
 					break;
 				}
 
-				if (/^uuid\([0-9]*\)$/.test(value.name)) {
+				if (/^uuid\([0-9]*\)$/.test(value.name) || value.name === "uuid") {
 					column = column + `.default(sql\`uuid()\`)`;
 
 					drizzleImports.add('sql');
