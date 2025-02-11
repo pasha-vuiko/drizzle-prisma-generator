@@ -80,6 +80,11 @@ const prismaToDrizzleType = (
 			pgImports.add('integer');
 			return `integer('${colDbName}')`;
 		case 'string':
+			if (nativeType === 'Uuid') {
+				pgImports.add('uuid');
+				return `uuid('${colDbName}')`;
+			}
+
 			pgImports.add('text');
 			return `text('${colDbName}')`;
 		default:
